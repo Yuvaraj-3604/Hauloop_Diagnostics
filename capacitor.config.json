@@ -1,0 +1,8 @@
+{
+  "appId": "com.hauloop.fmc650diagnostics",
+  "appName": "HAULOOP CAN Diagnostics",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

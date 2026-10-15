@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teltonika FMC650 Fleet Telematics & SAE J1939 CAN Diagnostics</title>
+  <meta name="description" content="Next-generation heavy-duty commercial truck telematics dashboard powered by Teltonika FMC650 J1939 CAN protocol decoding and AWS IoT Core real-time streaming.">
+  
+  <!-- Modern Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Offline/Local Vendor Libraries -->
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  
+  <!-- Application CSS System -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       TOP HEADER & CONTROL BAR
+       ======================================================================== -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo-badge" title="Teltonika FMC650 J1939 Telematics">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zm0 8.5L4.5 7.25 12 4l7.5 3.25L12 10.5zM2 17l10 5 10-5-1.9-0.95L12 20.15l-8.1-4.1L2 17zm0-5l10 5 10-5-1.9-0.95L12 15.15l-8.1-4.1L2 12z"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>
+          TELTONIKA FMC650
+          <span class="device-tag">J1939 CAN COCKPIT</span>
+        </h1>
+        <div class="brand-subtitle">Commercial Vehicle Telematics Engine • AWS IoT Core Pipeline</div>
+      </div>
+    </div>
+
+    <!-- Live Status Indicators -->
+    <div class="header-status-strip">
+      <div class="status-pill" id="wsStatusPill" title="WebSocket Pipeline State">
+        <span class="pulse-indicator amber" id="wsPulse"></span>
+        <span id="wsStatusText">Connecting...</span>
+      </div>
+
+      <div class="status-pill" id="mqttStatusPill" title="AWS IoT Core MQTT Connection">
+        <span class="pulse-indicator blue" id="mqttPulse"></span>
+        <span id="mqttStatusText">FMC650 Simulator Active</span>
+      </div>
+
+      <div class="status-pill" title="CAN Bus Physical Transceiver">
+        <span class="pulse-indicator green"></span>
+        <span>CAN1: 250 kbps Extended</span>
+      </div>
+    </div>
+
+    <!-- Actions & Simulator Toggle -->
+    <div class="header-actions">
+      <div class="sim-toggle-wrap">
+        <span class="sim-toggle-label">SIMULATOR</span>
+        <label class="switch">
+          <input type="checkbox" id="simToggleCheckbox" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <button class="btn-header primary" id="btnOpenInjectorModal" title="Inject or test custom FMC650 JSON payloads">
+        <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
+          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+        <span>Test Payload Injector</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       CRITICAL ALERTS TOP TICKER
+       ======================================================================== -->
+  <aside class="alert-banner-strip" id="alertBannerStrip" aria-label="Critical Alerts">
+    <div class="alert-banner-content">
+      <div class="alert-badge-icon">!</div>
+      <div id="alertBannerMsg">
+        <strong>CRITICAL SAFETY ALERT</strong>: Evaluating vehicle threshold rules...
+      </div>
+    </div>
+    <div style="font-size: 0.74rem; color: #fca5a5;">J1939 Safety Interlock</div>
+  </aside>
+
+  <!-- ========================================================================
+       SIMULATOR INTERACTIVE SCENARIO CONTROLLER
+       ======================================================================== -->
+  <nav class="simulator-toolbar" aria-label="Simulation Scenarios">
+    <div class="scenario-pills-group">
+      <span class="scenario-label">Scenario:</span>
+      <button class="scenario-btn active" data-scenario="HIGHWAY">Highway Cruise (NH-45)</button>
+      <button class="scenario-btn" data-scenario="UPHILL">Heavy Haul Uphill (90% Load)</button>
+      <button class="scenario-btn" data-scenario="OVERHEAT">Engine Overheat (111°C)</button>
+      <button class="scenario-btn" data-scenario="LOW_OIL">Low Oil Starvation (90 kPa)</button>
+      <button class="scenario-btn" data-scenario="HARSH_BRAKE">Harsh Braking Event</button>
+      <button class="scenario-btn" data-scenario="IDLE">Idle Docking</button>
+    </div>
+
+    <div class="throttle-slider-wrap">
+      <label for="manualThrottleSlider">Pedal Throttle:</label>
+      <input type="range" id="manualThrottleSlider" min="0" max="100" value="45">
+      <span class="throttle-val mono" id="manualThrottleVal">45%</span>
+    </div>
+  </nav>
+
+  <!-- ========================================================================
+       MAIN DASHBOARD WORKSPACE
+       ======================================================================== -->
+  <main class="dashboard-container">
+
+    <!-- KPI STRIP -->
+    <section class="kpi-strip" aria-label="Key Performance Indicators">
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <div class="kpi-label">Vehicle Road Speed</div>
+          <div class="kpi-val mono"><span id="kpiSpeed">0</span><span class="kpi-unit">km/h</span></div>
+        </div>
+        <div class="kpi-icon-wrap" style="color: #00f2fe;">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7h1.5z"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <div class="kpi-label">Engine Speed (RPM)</div>
+          <div class="kpi-val mono"><span id="kpiRpm">0</span><span class="kpi-unit">RPM</span></div>
+        </div>
+        <div class="kpi-icon-wrap" style="color: #3b82f6;">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14.5v-2.1c1.8-.4 3.1-2 3.1-3.9 0-2.2-1.8-4-4-4s-4 1.8-4 4c0 1.9 1.3 3.5 3.1 3.9v2.1c-3.1-.5-5.5-3.1-5.5-6.5 0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5c-.1 3.4-2.5 6-5.6 6.5z"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <div class="kpi-label">Instant Fuel Rate</div>
+          <div class="kpi-val mono"><span id="kpiFuelRate">0.0</span><span class="kpi-unit">L/h</span></div>
+        </div>
+        <div class="kpi-icon-wrap" style="color: #f59e0b;">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33a2.5 2.5 0 0 0 2.5 2.5c.36 0 .69-.1 1-.26v8.26a1.5 1.5 0 0 1-1.5 1.5 1.5 1.5 0 0 1-1.5-1.5V14a2 2 0 0 0-2-2H13V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-5h1v5.5a3.5 3.5 0 0 0 3.5 3.5 3.5 3.5 0 0 0 3.5-3.5V9c0-.69-.28-1.32-.73-1.77zM11 10H5V5h6v5z"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <div class="kpi-label">Coolant Temperature</div>
+          <div class="kpi-val mono"><span id="kpiCoolant">0°C</span></div>
+        </div>
+        <div class="kpi-icon-wrap" style="color: #10b981;">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 13V5a3 3 0 0 0-6 0v8a5 5 0 1 0 6 0m-3-10a1 1 0 0 1 1 1v5h-2V4a1 1 0 0 1 1-1z"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <div class="kpi-label">Engine Oil Pressure</div>
+          <div class="kpi-val mono"><span id="kpiOil">0</span><span class="kpi-unit">kPa</span></div>
+        </div>
+        <div class="kpi-icon-wrap" style="color: #8b5cf6;">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a5 5 0 0 0-5 5c0 3.25 5 9 5 9s5-5.75 5-9a5 5 0 0 0-5-5m0 6.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <div class="kpi-label">Active Gear</div>
+          <div class="kpi-val mono"><span id="kpiGear">N</span></div>
+        </div>
+        <div class="kpi-icon-wrap" style="color: #00f2fe;">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10S2 17.52 2 12zm7-3h6v2h-4v2h3v2h-3v2h4v2H9V9z"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: COCKPIT GAUGES & LIVE GPS MAP -->
+    <div class="cockpit-grid">
+      
+      <!-- LEFT: DIGITAL COCKPIT INSTRUMENT CLUSTER -->
+      <section class="glass-card gauges-cluster" aria-label="Digital Cockpit Instrument Cluster">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+            Digital Instrument Cockpit (J1939 Powertrain)
+          </div>
+          <span class="card-action-badge mono">ECU 0x00 & 0x03</span>
+        </div>
+
+        <!-- Primary Dual Dials -->
+        <div class="primary-dials-row">
+          <!-- Tachometer -->
+          <div class="dial-card">
+            <div class="gauge-svg-container">
+              <canvas id="tachometerCanvas"></canvas>
+              <div class="dial-center-hud">
+                <div class="hud-val mono" id="tachRpmVal">0</div>
+                <div class="hud-unit">RPM x1</div>
+                <div style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">Redline 2,200</div>
+              </div>
+            </div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
+              Tachometer (EEC1 0xF004)
+            </div>
+          </div>
+
+          <!-- Speedometer -->
+          <div class="dial-card">
+            <div class="gauge-svg-container">
+              <canvas id="speedometerCanvas"></canvas>
+              <div class="dial-center-hud">
+                <div class="hud-val mono" id="speedKmVal">0</div>
+                <div class="hud-unit">km/h</div>
+                <div class="gear-badge mono" id="cockpitGearBadge">N</div>
+              </div>
+            </div>
+            <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
+              Speedometer (CCVS1 0xFEF1)
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary Mini Dials -->
+        <div class="secondary-gauges-row">
+          <div class="mini-gauge-card">
+            <div class="mini-gauge-title">Coolant Temp</div>
+            <div class="mini-gauge-canvas-wrap">
+              <canvas id="coolantCanvas"></canvas>
+            </div>
+            <div class="mini-gauge-val mono" id="coolantVal">0 °C</div>
+          </div>
+
+          <div class="mini-gauge-card">
+            <div class="mini-gauge-title">Oil Pressure</div>
+            <div class="mini-gauge-canvas-wrap">
+              <canvas id="oilPressCanvas"></canvas>
+            </div>
+            <div class="mini-gauge-val mono" id="oilPressVal">0 kPa</div>
+          </div>
+
+          <div class="mini-gauge-card">
+            <div class="mini-gauge-title">Air Brake Tanks</div>
+            <div class="mini-gauge-canvas-wrap">
+              <canvas id="airTankCanvas"></canvas>
+            </div>
+            <div class="mini-gauge-val mono" id="airTankVal">0 kPa</div>
+          </div>
+
+          <div class="mini-gauge-card">
+            <div class="mini-gauge-title">24V System Volt</div>
+            <div class="mini-gauge-canvas-wrap">
+              <canvas id="extVoltCanvas"></canvas>
+            </div>
+            <div class="mini-gauge-val mono" id="extVoltVal">24.2 V</div>
+          </div>
+        </div>
+
+        <!-- Vertical Fluid Bars -->
+        <div class="fluid-bars-container">
+          <div class="fluid-bar-widget">
+            <div class="fluid-bar-header">
+              <span>DIESEL FUEL TANK (SPN 96)</span>
+              <span class="mono" id="fuelBarText">76%</span>
+            </div>
+            <div class="fluid-progress-track">
+              <div class="fluid-progress-fill" id="fuelBarFill" style="width: 76%;"></div>
+            </div>
+          </div>
+
+          <div class="fluid-bar-widget">
+            <div class="fluid-bar-header">
+              <span>BS-VI DEF / ADBLUE LEVEL</span>
+              <span class="mono" id="defBarText">74%</span>
+            </div>
+            <div class="fluid-progress-track">
+              <div class="fluid-progress-fill def" id="defBarFill" style="width: 74%;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: LIVE FLEET GPS MAP -->
+      <section class="glass-card map-panel" aria-label="Interactive Fleet GPS Map">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+            Live GPS Tracking • NH-45 Highway Corridor
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 0.74rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <input type="checkbox" id="mapAutoFollowCheck" checked> Auto-Center
+            </label>
+            <span class="card-action-badge">Tiruchirappalli, TN</span>
+          </div>
+        </div>
+
+        <div class="map-view-container">
+          <div id="leafletMap"></div>
+
+          <!-- Floating HUD Overlay -->
+          <div class="map-hud-overlay mono">
+            <div class="map-hud-line">
+              <span class="map-hud-label">LAT:</span>
+              <span class="map-hud-val" id="mapHudLat">10.823078</span>
+            </div>
+            <div class="map-hud-line">
+              <span class="map-hud-label">LNG:</span>
+              <span class="map-hud-val" id="mapHudLng">78.685815</span>
+            </div>
+            <div class="map-hud-line">
+              <span class="map-hud-label">HEADING:</span>
+              <span class="map-hud-val" id="mapHudHeading">48°</span>
+            </div>
+            <div class="map-hud-line">
+              <span class="map-hud-label">ALTITUDE:</span>
+              <span class="map-hud-val" id="mapHudAlt">85 m</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SECTION 3: TELEMETRY TRENDS & DIAGNOSTICS ALERTS -->
+    <div class="telemetry-row">
+      <!-- Live Sparkline Multi-Axis Trend -->
+      <section class="glass-card" aria-label="Real-time Telemetry Trends">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+            Real-Time Driveline Dynamic Sparkline
+          </div>
+          <span class="card-action-badge mono">Last 40 sec</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="telemetryTrendChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Active Alerts & DM1 DTC Diagnostics Scanner -->
+      <section class="glass-card diagnostics-panel" aria-label="Diagnostics & Alerts">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg>
+            J1939 Active Faults (DM1) & Safety Rules
+          </div>
+          <span class="dtc-badge" id="dtcStatusBadge">NO ACTIVE DTCS (HEALTHY)</span>
+        </div>
+
+        <div class="alert-item-list" id="activeAlertsList">
+          <!-- Filled dynamically by app.js -->
+        </div>
+      </section>
+    </div>
+
+    <!-- SECTION 4: LIVE CAN SIGNAL INSPECTOR TABLE -->
+    <section class="glass-card can-inspector-section" aria-label="CAN Signal Inspector">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+          CAN Signal Inspector (FMC650 Manual CAN00 – CAN14 Channels & AVL Elements)
+        </div>
+        <div style="font-size: 0.74rem; color: #64748b;">
+          Last Packet: <span class="mono" id="lastPacketTime">--:--:--</span>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="can-table" id="canInspectorTable">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>AVL ID</th>
+              <th>Signal Description</th>
+              <th>PGN</th>
+              <th>Raw Hex Payload</th>
+              <th>Decoded Physical Value</th>
+              <th>J1939 Scaling Formula</th>
+            </tr>
+          </thead>
+          <tbody id="canTableBody">
+            <!-- Dynamically populated rows -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================
+       MODAL: RAW PAYLOAD INJECTOR & TEST CONSOLE
+       ======================================================================== -->
+  <div class="modal-overlay" id="injectorModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">
+          <svg style="width: 20px; height: 20px; fill: #00f2fe;" viewBox="0 0 24 24">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+          Teltonika FMC650 Raw Payload Injector
+        </div>
+        <button class="modal-close-btn" id="btnCloseInjectorModal" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <div style="font-size: 0.8rem; color: #94a3b8;">
+        Inject raw AVL JSON packets (identical to AWS IoT Core MQTT message payloads). Select a test scenario preset or modify values:
+      </div>
+
+      <div class="preset-buttons-row">
+        <button class="preset-btn" data-preset="normal_cruise">Normal Highway 72 km/h</button>
+        <button class="preset-btn" data-preset="over_rev">Over-Revving (2550 RPM)</button>
+        <button class="preset-btn" data-preset="overheat">Severe Overheat (111°C)</button>
+        <button class="preset-btn" data-preset="low_def">Low DEF (6% Derate)</button>
+        <button class="preset-btn" data-preset="low_air_brake">Air Brake Depleted (464 kPa)</button>
+      </div>
+
+      <textarea class="payload-textarea" id="payloadTextarea" spellcheck="false"></textarea>
+
+      <div class="modal-footer">
+        <button class="btn-header primary" id="btnSubmitPayload">Transmit / Inject Payload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor Scripts (Local offline copies) -->
+  <script src="vendor/leaflet.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
+
+  <!-- Application Logic -->
+  <script src="js/gauges.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
