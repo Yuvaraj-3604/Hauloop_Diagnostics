@@ -1,5 +1,5 @@
-// User Database Management Module for HAULOOP Telematics
-// Handles persistent storage for all registered user accounts under 'user_database' and 'user_database_details'
+// User Database Management & Cross-Platform Sync Module for HAULOOP Telematics
+// Synchronizes registered user accounts across Web and Android APK via local storage & cloud channel
 
 export const STORAGE_KEYS = {
   PRIMARY: "user_database",
@@ -7,10 +7,27 @@ export const STORAGE_KEYS = {
   LEGACY: "hauloop_registered_users"
 };
 
-// Default seed accounts if user database is fresh
-const DEFAULT_SEED_USERS = [
+// Global Cloud Sync Endpoint to bridge Web and APK registrations
+const CLOUD_SYNC_URL = "https://api.restful-api.dev/objects/ff808181a09d98f701a15d31bb43384b";
+
+// Built-in Seed Accounts (Preloaded for both Web and APK out-of-the-box)
+export const DEFAULT_SEED_USERS = [
   {
     id: "USR-SEED-001",
+    operatorId: "ADM-3604",
+    fullName: "Yuvaraj Perumal",
+    email: "yuvarajperumal364@gmail.com",
+    username: "yuvarajperumal364",
+    role: "Fleet Administrator",
+    password: "hauloop2026",
+    status: "Active",
+    securityClearance: "Level 3 (Root Telematics)",
+    terminalStation: "HAULOOP-TERM-04",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    lastLogin: new Date().toISOString()
+  },
+  {
+    id: "USR-SEED-002",
     operatorId: "ADM-1001",
     fullName: "System Administrator",
     email: "admin@hauloop.com",
@@ -24,9 +41,9 @@ const DEFAULT_SEED_USERS = [
     lastLogin: new Date().toISOString()
   },
   {
-    id: "USR-SEED-002",
+    id: "USR-SEED-003",
     operatorId: "ENG-4825",
-    fullName: "Diagnostic Systems Lead",
+    fullName: "Diagnostic Field Engineer",
     email: "engineer@hauloop.com",
     username: "engineer",
     role: "Diagnostic Engineer",
@@ -36,18 +53,45 @@ const DEFAULT_SEED_USERS = [
     terminalStation: "HAULOOP-TERM-02",
     createdAt: "2026-01-01T00:00:00.000Z",
     lastLogin: new Date().toISOString()
+  },
+  {
+    id: "USR-SEED-004",
+    operatorId: "OP-6613",
+    fullName: "Yuvaraj",
+    email: "yuvarajpperumal364@gmail.com",
+    username: "yuvarajpperumal364",
+    role: "Fleet Administrator",
+    password: "hauloop2026",
+    status: "Active",
+    securityClearance: "Level 3 (Root Telematics)",
+    terminalStation: "HAULOOP-TERM-04",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    lastLogin: new Date().toISOString()
+  },
+  {
+    id: "USR-SEED-005",
+    operatorId: "OP-1901",
+    fullName: "Yuva",
+    email: "yuvarajperumalv@gmail.com",
+    username: "yuvarajperumalv",
+    role: "Fleet Administrator",
+    password: "hauloop2026",
+    status: "Active",
+    securityClearance: "Level 3 (Root Telematics)",
+    terminalStation: "HAULOOP-TERM-04",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    lastLogin: new Date().toISOString()
   }
 ];
 
 /**
- * Normalizes a raw user object ensuring no undefined/null properties.
+ * Normalizes a user record ensuring no undefined/null properties.
  */
 export function normalizeUser(raw) {
   if (!raw) return null;
   const rawEmail = (raw.email || "").trim();
   const rawUser = (raw.username || "").trim();
-  const derivedEmail =
-    rawEmail || (rawUser.includes("@") ? rawUser : "");
+  const derivedEmail = rawEmail || (rawUser.includes("@") ? rawUser : "");
   const derivedUser = rawUser || (rawEmail.includes("@") ? rawEmail.split("@")[0] : rawEmail);
   const fullName = (raw.fullName || raw.name || derivedUser || "Fleet Operator").trim();
 
@@ -68,7 +112,7 @@ export function normalizeUser(raw) {
 }
 
 /**
- * Retrieves all registered users from user_database.
+ * Retrieves all registered users from local user_database, merged with built-in seeds.
  */
 export function getUserDatabase() {
   try {
@@ -83,12 +127,13 @@ export function getUserDatabase() {
       parsed = Array.isArray(data) ? data : (data.users || []);
     }
 
-    // Merge default seed accounts if not already present
     const normalizedList = parsed.map(normalizeUser).filter(Boolean);
     const existingEmails = new Set(normalizedList.map(u => u.email.toLowerCase()));
+    const existingUsers = new Set(normalizedList.map(u => u.username.toLowerCase()));
 
+    // Merge default seeds if not already present
     DEFAULT_SEED_USERS.forEach(seed => {
-      if (!existingEmails.has(seed.email.toLowerCase())) {
+      if (!existingEmails.has(seed.email.toLowerCase()) && !existingUsers.has(seed.username.toLowerCase())) {
         normalizedList.push(seed);
       }
     });
@@ -101,7 +146,7 @@ export function getUserDatabase() {
 }
 
 /**
- * Saves a new or updated user to user_database, user_database_details, and legacy keys.
+ * Saves a new user to user_database, updating local storage and background cloud sync.
  */
 export function saveToUserDatabase(userData) {
   try {
@@ -111,7 +156,7 @@ export function saveToUserDatabase(userData) {
     const cleanEmail = normalized.email.toLowerCase();
     const cleanUser = normalized.username.toLowerCase();
 
-    // Remove any existing user matching email or username
+    // Remove duplicates
     const filtered = currentUsers.filter(u => {
       const uEmail = (u.email || "").toLowerCase();
       const uUser = (u.username || "").toLowerCase();
@@ -121,11 +166,12 @@ export function saveToUserDatabase(userData) {
     filtered.push(normalized);
 
     const jsonStr = JSON.stringify(filtered, null, 2);
-
-    // Save across storage keys for complete consistency
     localStorage.setItem(STORAGE_KEYS.PRIMARY, jsonStr);
     localStorage.setItem(STORAGE_KEYS.DETAILS, jsonStr);
     localStorage.setItem(STORAGE_KEYS.LEGACY, jsonStr);
+
+    // Asynchronously sync to Cloud Channel so other platform (Web or APK) receives it
+    syncDatabaseToCloud(filtered);
 
     return normalized;
   } catch (err) {
@@ -135,7 +181,7 @@ export function saveToUserDatabase(userData) {
 }
 
 /**
- * Updates the last login timestamp for a user.
+ * Records login timestamp for user.
  */
 export function recordUserLogin(identifier) {
   try {
@@ -155,4 +201,72 @@ export function recordUserLogin(identifier) {
   } catch {
     // ignore
   }
+}
+
+/**
+ * Asynchronously syncs local users to the shared cloud channel.
+ */
+export async function syncDatabaseToCloud(users) {
+  try {
+    const payload = users || getUserDatabase();
+    await fetch(CLOUD_SYNC_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "hauloop_user_database",
+        data: { users: payload, syncedAt: new Date().toISOString() }
+      })
+    });
+  } catch {
+    // Offline resilience: ignore network failure silently
+  }
+}
+
+/**
+ * Pulls latest users from the shared cloud channel (e.g. signed up on Web, pulling into APK).
+ */
+export async function syncDatabaseFromCloud() {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    const res = await fetch(CLOUD_SYNC_URL, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return getUserDatabase();
+
+    const result = await res.json();
+    const remoteUsers = result?.data?.users;
+
+    if (Array.isArray(remoteUsers) && remoteUsers.length > 0) {
+      const localUsers = getUserDatabase();
+      const localMap = new Map();
+
+      localUsers.forEach(u => {
+        if (u.email) localMap.set(u.email.toLowerCase(), u);
+        if (u.username) localMap.set(u.username.toLowerCase(), u);
+      });
+
+      // Merge remote users
+      remoteUsers.forEach(ru => {
+        const norm = normalizeUser(ru);
+        if (norm) {
+          const key = (norm.email || norm.username).toLowerCase();
+          if (!localMap.has(key)) {
+            localMap.set(key, norm);
+          }
+        }
+      });
+
+      const merged = Array.from(new Set(localMap.values()));
+      const jsonStr = JSON.stringify(merged, null, 2);
+      localStorage.setItem(STORAGE_KEYS.PRIMARY, jsonStr);
+      localStorage.setItem(STORAGE_KEYS.DETAILS, jsonStr);
+      localStorage.setItem(STORAGE_KEYS.LEGACY, jsonStr);
+      return merged;
+    }
+  } catch {
+    // Offline fallback
+  }
+  return getUserDatabase();
 }
