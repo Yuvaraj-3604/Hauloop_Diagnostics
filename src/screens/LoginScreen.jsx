@@ -16,6 +16,37 @@ const ROLE_OPTIONS = [
   "Fleet Administrator"
 ];
 
+// Pre-configured system accounts (permanently stored and always accessible)
+export const SEED_USERS = [
+  {
+    username: "yuvarajperumal364",
+    email: "yuvarajperumal364@gmail.com",
+    fullName: "Yuvaraj Perumal",
+    role: "Fleet Administrator",
+    password: "Yuva@123",
+    operatorId: "ADM-3604",
+    createdAt: "2026-10-21T06:00:00.000Z"
+  },
+  {
+    username: "admin",
+    email: "admin@hauloop.com",
+    fullName: "System Administrator",
+    role: "Fleet Administrator",
+    password: "hauloop2026",
+    operatorId: "ADM-1001",
+    createdAt: "2026-10-01T00:00:00.000Z"
+  },
+  {
+    username: "engineer",
+    email: "engineer@hauloop.com",
+    fullName: "Diagnostic Field Engineer",
+    role: "Diagnostic Engineer",
+    password: "fmc650",
+    operatorId: "ENG-4825",
+    createdAt: "2026-10-01T00:00:00.000Z"
+  }
+];
+
 export default function LoginScreen({ onLoginSuccess }) {
   // Mode: "signin" | "signup"
   const [mode, setMode] = useState("signin");
@@ -155,7 +186,10 @@ export default function LoginScreen({ onLoginSuccess }) {
   };
 
   const handleQuickFill = (userType) => {
-    if (userType === "admin") {
+    if (userType === "yuvaraj") {
+      setEmailOrUsername("yuvarajperumal364@gmail.com");
+      setPassword("Yuva@123");
+    } else if (userType === "admin") {
       setEmailOrUsername("admin@hauloop.com");
       setPassword("hauloop2026");
     } else {
@@ -170,30 +204,57 @@ export default function LoginScreen({ onLoginSuccess }) {
   };
 
   const getRegisteredUsers = () => {
+    let savedList = [];
     try {
       const saved = localStorage.getItem("hauloop_registered_users");
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [];
-      // Normalize users so null/undefined properties never cause crashes
-      return parsed.map((u) => {
-        const rawEmail = (u?.email || "").trim();
-        const rawUser = (u?.username || "").trim();
-        const derivedEmail = rawEmail || (rawUser.includes("@") ? rawUser : (rawUser ? `${rawUser}@gmail.com` : ""));
-        const derivedUser = rawUser || (rawEmail.includes("@") ? rawEmail.split("@")[0] : rawEmail);
-        return {
-          ...u,
-          email: derivedEmail,
-          username: derivedUser || "operator",
-          fullName: (u?.fullName || derivedUser || "Fleet Operator").trim(),
-          password: (u?.password || "").trim(),
-          role: u?.role || "Fleet Administrator",
-          operatorId: u?.operatorId || "OP-1001"
-        };
-      });
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          savedList = parsed;
+        }
+      }
     } catch {
-      return [];
+      // storage fallback
     }
+
+    // Merge SEED_USERS with any user who signed up, preserving all custom updates
+    const allUsers = [...SEED_USERS];
+    savedList.forEach((u) => {
+      const uEmail = (u?.email || "").trim().toLowerCase();
+      const uUser = (u?.username || "").trim().toLowerCase();
+      const existsIndex = allUsers.findIndex(
+        (s) => (s.email || "").toLowerCase() === uEmail || (s.username || "").toLowerCase() === uUser
+      );
+      if (existsIndex === -1) {
+        allUsers.push(u);
+      } else {
+        allUsers[existsIndex] = { ...allUsers[existsIndex], ...u };
+      }
+    });
+
+    // Keep localStorage synchronized so all signups are permanently retained
+    try {
+      localStorage.setItem("hauloop_registered_users", JSON.stringify(allUsers));
+    } catch {
+      // ignore
+    }
+
+    // Normalize all user objects
+    return allUsers.map((u) => {
+      const rawEmail = (u?.email || "").trim();
+      const rawUser = (u?.username || "").trim();
+      const derivedEmail = rawEmail || (rawUser.includes("@") ? rawUser : (rawUser ? `${rawUser}@gmail.com` : ""));
+      const derivedUser = rawUser || (rawEmail.includes("@") ? rawEmail.split("@")[0] : rawEmail);
+      return {
+        ...u,
+        email: derivedEmail,
+        username: derivedUser || "operator",
+        fullName: (u?.fullName || derivedUser || "Fleet Operator").trim(),
+        password: (u?.password || "").trim(),
+        role: u?.role || "Fleet Administrator",
+        operatorId: u?.operatorId || "ADM-3604"
+      };
+    });
   };
 
   const saveRegisteredUser = (newUser) => {
@@ -668,20 +729,21 @@ export default function LoginScreen({ onLoginSuccess }) {
 
           {/* Discreet Quick Demo Credentials Fillers */}
           <div className="hl-demo-pills">
-            <span className="hl-demo-label">Demo Quick Fill:</span>
+            <span className="hl-demo-label">Quick Fill:</span>
+            <button
+              type="button"
+              className="hl-demo-pill"
+              onClick={() => handleQuickFill("yuvaraj")}
+              title="Quick fill yuvarajperumal364@gmail.com / Yuva@123"
+            >
+              yuvarajperumal364@gmail.com
+            </button>
             <button
               type="button"
               className="hl-demo-pill"
               onClick={() => handleQuickFill("admin")}
             >
               admin@hauloop.com
-            </button>
-            <button
-              type="button"
-              className="hl-demo-pill"
-              onClick={() => handleQuickFill("engineer")}
-            >
-              engineer@hauloop.com
             </button>
           </div>
 
