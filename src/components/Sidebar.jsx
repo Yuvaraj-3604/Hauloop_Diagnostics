@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { id: "history", label: "Screen 8 · Signal History", icon: Activity }
 ];
 
-export default function Sidebar({ page, setPage, open, setOpen, snapshot, currentUser, onLogout }) {
+export default function Sidebar({ page, setPage, open, setOpen, snapshot, currentUser, onLogout, onOpenProfile }) {
   const activeDev = snapshot?.activeDevice || { name: "FMC650 Unit", imei: "867530901234567" };
   const eventsCount = snapshot?.events?.length || 0;
   const activeSlots = snapshot?.slots?.filter(s => s.status === "Receiving")?.length || 10;
@@ -86,15 +86,27 @@ export default function Sidebar({ page, setPage, open, setOpen, snapshot, curren
           })}
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="sidebar-footer">
+        {/* Sidebar Footer - Clickable Profile Card */}
+        <div
+          className="sidebar-footer clickable"
+          onClick={() => {
+            if (setOpen) setOpen(false);
+            if (onOpenProfile) onOpenProfile();
+          }}
+          title="Click to view full operator profile details"
+          role="button"
+          tabIndex={0}
+        >
           <div className="avatar">
             {(currentUser?.username || "FMC").slice(0, 3).toUpperCase()}
           </div>
-          <div>
-            <b>{currentUser?.username || "Teltonika Lab Bench"}</b>
-            <small>{currentUser?.role || "Native JS Telematics Engine"}</small>
+          <div className="sidebar-footer-text">
+            <b>{currentUser?.username || "yuvarajperumal364"}</b>
+            <small>{currentUser?.role || "Fleet Administrator"}</small>
           </div>
+          <span className="sidebar-profile-badge" title="View Profile Details">
+            View ↗
+          </span>
         </div>
 
         {/* Sidebar Sign Out Action */}

@@ -16,11 +16,13 @@ import DiagnosticsScreen from "./screens/DiagnosticsScreen.jsx";
 import DeviceManagementScreen from "./screens/DeviceManagementScreen.jsx";
 import EventLogsScreen from "./screens/EventLogsScreen.jsx";
 import SignalHistoryScreen from "./screens/SignalHistoryScreen.jsx";
+import ProfileDetailsModal from "./components/ProfileDetailsModal.jsx";
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [drilldownCanId, setDrilldownCanId] = useState("0CF00400");
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [snapshot, setSnapshot] = useState(() => telematicsEngine.getSnapshot());
 
   // Authentication State
@@ -120,6 +122,7 @@ export default function App() {
         snapshot={snapshot}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenProfile={() => setProfileModalOpen(true)}
       />
       <main className="main-area">
         <Topbar
@@ -128,6 +131,7 @@ export default function App() {
           snapshot={snapshot}
           currentUser={currentUser}
           onLogout={handleLogout}
+          onOpenProfile={() => setProfileModalOpen(true)}
         />
         {renderActiveScreen()}
         <footer className="app-footer">
@@ -180,6 +184,15 @@ export default function App() {
           <span>Screens</span>
         </button>
       </nav>
+
+      {/* Operator Profile Details Dialog */}
+      <ProfileDetailsModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        currentUser={currentUser}
+        activeDevice={snapshot.activeDevice}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

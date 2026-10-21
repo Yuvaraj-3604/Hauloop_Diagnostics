@@ -37,7 +37,7 @@ const SCREEN_TITLES = {
   ]
 };
 
-export default function Topbar({ page, setOpen, snapshot, currentUser, onLogout }) {
+export default function Topbar({ page, setOpen, snapshot, currentUser, onLogout, onOpenProfile }) {
   const [title, subtitle] = SCREEN_TITLES[page] || SCREEN_TITLES.dashboard;
   const { devices, activeDevice, isRunning, state } = snapshot;
 
@@ -91,20 +91,18 @@ export default function Topbar({ page, setOpen, snapshot, currentUser, onLogout 
         </div>
       </div>
 
-      {/* Operator Profile & Sign Out Button */}
-      <div className="operator-profile-pill" title={`Logged in as ${currentUser?.role || "Diagnostic Engineer"}`}>
+      {/* Operator Profile Pill (Exit button removed, clickable to view details) */}
+      <div
+        className="operator-profile-pill clickable"
+        onClick={() => onOpenProfile && onOpenProfile()}
+        title="View Operator Profile Details"
+        role="button"
+        tabIndex={0}
+      >
         <span className="operator-avatar">
           {(currentUser?.username || "E").slice(0, 1).toUpperCase()}
         </span>
         <span className="operator-name">{currentUser?.username || "Engineer"}</span>
-        <button
-          className="topbar-signout-btn"
-          onClick={onLogout}
-          title="Sign Out / Lock Terminal"
-        >
-          <LogOut size={12} />
-          <span>Exit</span>
-        </button>
       </div>
     </header>
   );
