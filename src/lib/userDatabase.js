@@ -69,6 +69,13 @@ export function normalizeUser(raw) {
   };
 }
 
+// Disallowed legacy default seed emails (must not be preloaded as default accounts)
+const DISALLOWED_DEFAULT_SEEDS = new Set([
+  "yuvarajperumal364@gmail.com",
+  "yuvarajpperumal364@gmail.com",
+  "yuvarajperumalv@gmail.com"
+]);
+
 /**
  * Retrieves all registered users from local user_database, merged with built-in seeds.
  */
@@ -86,17 +93,41 @@ export function getUserDatabase() {
     }
 
     const normalizedList = parsed.map(normalizeUser).filter(Boolean);
-    const existingEmails = new Set(normalizedList.map(u => u.email.toLowerCase()));
-    const existingUsers = new Set(normalizedList.map(u => u.username.toLowerCase()));
+    const validSeedIds = new Set(DEFAULT_SEED_USERS.map(s => s.id));
+
+    // Filter out obsolete seed accounts or cached default accounts
+    const cleanList = normalizedList.filter(u => {
+      if (u.id && u.id.startsWith("USR-SEED-")) {
+        return validSeedIds.has(u.id);
+      }
+      if (
+        DISALLOWED_DEFAULT_SEEDS.has((u.email || "").toLowerCase()) &&
+        (u.operatorId === "ADM-3604" || u.operatorId === "OP-6613" || u.operatorId === "OP-1901")
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const existingEmails = new Set(cleanList.map(u => u.email.toLowerCase()));
+    const existingUsers = new Set(cleanList.map(u => u.username.toLowerCase()));
 
     // Merge default seeds if not already present
     DEFAULT_SEED_USERS.forEach(seed => {
       if (!existingEmails.has(seed.email.toLowerCase()) && !existingUsers.has(seed.username.toLowerCase())) {
-        normalizedList.push(seed);
+        cleanList.push(seed);
       }
     });
 
-    return normalizedList;
+    // Write back clean list if changes were made to wipe obsolete cache on APK & Web
+    if (cleanList.length !== normalizedList.length) {
+      const jsonStr = JSON.stringify(cleanList, null, 2);
+      localStorage.setItem(STORAGE_KEYS.PRIMARY, jsonStr);
+      localStorage.setItem(STORAGE_KEYS.DETAILS, jsonStr);
+      localStorage.setItem(STORAGE_KEYS.LEGACY, jsonStr);
+    }
+
+    return cleanList;
   } catch (err) {
     console.error("Failed to read user_database:", err);
     return DEFAULT_SEED_USERS;
@@ -205,10 +236,22 @@ export async function syncDatabaseFromCloud() {
         if (u.username) localMap.set(u.username.toLowerCase(), u);
       });
 
+      const validSeedIds = new Set(DEFAULT_SEED_USERS.map(s => s.id));
+
       // Merge remote users
       remoteUsers.forEach(ru => {
         const norm = normalizeUser(ru);
         if (norm) {
+          // Skip obsolete seed accounts
+          if (norm.id && norm.id.startsWith("USR-SEED-") && !validSeedIds.has(norm.id)) {
+            return;
+          }
+          if (
+            DISALLOWED_DEFAULT_SEEDS.has((norm.email || "").toLowerCase()) &&
+            (norm.operatorId === "ADM-3604" || norm.operatorId === "OP-6613" || norm.operatorId === "OP-1901")
+          ) {
+            return;
+          }
           const key = (norm.email || norm.username).toLowerCase();
           if (!localMap.has(key)) {
             localMap.set(key, norm);
