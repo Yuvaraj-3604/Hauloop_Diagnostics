@@ -137,14 +137,19 @@ export default function LoginScreen({ onLoginSuccess }) {
 
   useEffect(() => {
     const code = generateCaptcha();
-    setTimeout(() => renderCaptchaCanvas(code), 50);
+    const t1 = setTimeout(() => renderCaptchaCanvas(code), 50);
+    const t2 = setTimeout(() => renderCaptchaCanvas(code), 250);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [mode]);
 
   const handleRefreshCaptcha = () => {
     setIsRotating(true);
     setTimeout(() => setIsRotating(false), 500);
     const code = generateCaptcha();
-    renderCaptchaCanvas(code);
+    setTimeout(() => renderCaptchaCanvas(code), 20);
     setCaptchaInput("");
     setError(null);
   };
@@ -157,13 +162,35 @@ export default function LoginScreen({ onLoginSuccess }) {
       setEmailOrUsername("engineer@hauloop.com");
       setPassword("fmc650");
     }
+    // Also auto-fill captcha for instant 1-click test login
+    if (captchaCode) {
+      setCaptchaInput(captchaCode);
+    }
     setError(null);
   };
 
   const getRegisteredUsers = () => {
     try {
       const saved = localStorage.getItem("hauloop_registered_users");
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      // Normalize users so null/undefined properties never cause crashes
+      return parsed.map((u) => {
+        const rawEmail = (u?.email || "").trim();
+        const rawUser = (u?.username || "").trim();
+        const derivedEmail = rawEmail || (rawUser.includes("@") ? rawUser : (rawUser ? `${rawUser}@gmail.com` : ""));
+        const derivedUser = rawUser || (rawEmail.includes("@") ? rawEmail.split("@")[0] : rawEmail);
+        return {
+          ...u,
+          email: derivedEmail,
+          username: derivedUser || "operator",
+          fullName: (u?.fullName || derivedUser || "Fleet Operator").trim(),
+          password: (u?.password || "").trim(),
+          role: u?.role || "Fleet Administrator",
+          operatorId: u?.operatorId || "OP-1001"
+        };
+      });
     } catch {
       return [];
     }
@@ -172,8 +199,16 @@ export default function LoginScreen({ onLoginSuccess }) {
   const saveRegisteredUser = (newUser) => {
     try {
       const users = getRegisteredUsers();
-      users.push(newUser);
-      localStorage.setItem("hauloop_registered_users", JSON.stringify(users));
+      const cleanEmail = (newUser.email || "").trim().toLowerCase();
+      const cleanUser = (newUser.username || "").trim().toLowerCase();
+      // Replace existing or append fresh
+      const filtered = users.filter((u) => {
+        const uEmail = (u.email || "").trim().toLowerCase();
+        const uUser = (u.username || "").trim().toLowerCase();
+        return uEmail !== cleanEmail && uUser !== cleanUser;
+      });
+      filtered.push(newUser);
+      localStorage.setItem("hauloop_registered_users", JSON.stringify(filtered));
     } catch {
       // storage fallback
     }
@@ -191,7 +226,7 @@ export default function LoginScreen({ onLoginSuccess }) {
       return;
     }
 
-    if (captchaInput.trim().toUpperCase() !== captchaCode.toUpperCase()) {
+    if (captchaInput.trim().toUpperCase() !== (captchaCode || "").trim().toUpperCase()) {
       setError("Invalid Captcha code. A fresh code has been generated.");
       handleRefreshCaptcha();
       return;
@@ -204,28 +239,34 @@ export default function LoginScreen({ onLoginSuccess }) {
         return;
       }
       if (!emailOrUsername.trim()) {
-        setError("Please enter your Email ID or Username.");
+        setError("Please enter your Email ID.");
         return;
       }
       if (!password.trim() || password.length < 4) {
         setError("Password must be at least 4 characters.");
         return;
       }
-      if (password !== confirmPassword) {
+      if (password.trim() !== confirmPassword.trim()) {
         setError("Passwords do not match.");
         return;
       }
 
       const existing = getRegisteredUsers();
       const cleanInput = emailOrUsername.trim().toLowerCase();
+      const alreadyExists = existing.some((u) => {
+        const uEmail = (u.email || "").toLowerCase();
+        const uUser = (u.username || "").toLowerCase();
+        return uEmail === cleanInput || uUser === cleanInput;
+      });
+
       if (
         cleanInput === "admin" ||
         cleanInput === "admin@hauloop.com" ||
         cleanInput === "engineer" ||
         cleanInput === "engineer@hauloop.com" ||
-        existing.some((u) => u.username.toLowerCase() === cleanInput || u.email.toLowerCase() === cleanInput)
+        alreadyExists
       ) {
-        setError("This account is already registered. Please sign in.");
+        setError("This account is already registered. Please click 'Sign In' below.");
         return;
       }
 
@@ -237,7 +278,7 @@ export default function LoginScreen({ onLoginSuccess }) {
           email: cleanEmail,
           fullName: fullName.trim(),
           role: role,
-          password: password,
+          password: password.trim(),
           operatorId: "OP-" + Math.floor(1000 + Math.random() * 9000),
           createdAt: new Date().toISOString()
         };
@@ -245,7 +286,7 @@ export default function LoginScreen({ onLoginSuccess }) {
 
         setIsLoading(false);
         setIsSuccess(true);
-        setSuccessMsg("Account created successfully. Loading workspace...");
+        setSuccessMsg("Account created successfully! Loading diagnostic console...");
 
         setTimeout(() => {
           onLoginSuccess(
@@ -259,12 +300,12 @@ export default function LoginScreen({ onLoginSuccess }) {
             },
             true
           );
-        }, 500);
-      }, 450);
+        }, 450);
+      }, 400);
     } else {
       // Sign In Flow
       if (!emailOrUsername.trim()) {
-        setError("Please enter your Email ID.");
+        setError("Please enter your Email ID or Username.");
         return;
       }
       if (!password.trim()) {
@@ -273,9 +314,9 @@ export default function LoginScreen({ onLoginSuccess }) {
       }
 
       const cleanInput = emailOrUsername.trim().toLowerCase();
-      const cleanPass = password;
+      const cleanPass = password.trim();
 
-      // Allow admin / engineer / demo or registered
+      // Check default administrator or engineer demo accounts
       const isDefaultAdmin =
         (cleanInput === "admin" || cleanInput === "admin@hauloop.com") &&
         (cleanPass === "hauloop2026" || cleanPass === "admin");
@@ -284,16 +325,31 @@ export default function LoginScreen({ onLoginSuccess }) {
         (cleanPass === "fmc650" || cleanPass === "engineer");
 
       const registeredUsers = getRegisteredUsers();
-      const matchedUser = registeredUsers.find(
-        (u) =>
-          (u.email.toLowerCase() === cleanInput || u.username.toLowerCase() === cleanInput) &&
-          u.password === cleanPass
-      );
 
-      if (!isDefaultAdmin && !isDefaultEng && !matchedUser && cleanPass !== "admin123") {
-        setError("Invalid Email ID or Password. Please check credentials or create an account.");
-        handleRefreshCaptcha();
-        return;
+      // Match by registered email, username, or full name
+      const matchedUser = registeredUsers.find((u) => {
+        const uEmail = (u.email || "").trim().toLowerCase();
+        const uUser = (u.username || "").trim().toLowerCase();
+        const uName = (u.fullName || "").trim().toLowerCase();
+        return uEmail === cleanInput || uUser === cleanInput || uName === cleanInput;
+      });
+
+      // Verify credentials
+      const isPasswordValid =
+        (matchedUser && (matchedUser.password || "").trim() === cleanPass) ||
+        cleanPass === "admin123";
+
+      if (!isDefaultAdmin && !isDefaultEng) {
+        if (!matchedUser && cleanPass !== "admin123") {
+          setError("No account found with this Email ID. Please check or click 'Sign Up' below.");
+          handleRefreshCaptcha();
+          return;
+        }
+        if (matchedUser && !isPasswordValid) {
+          setError("Incorrect password for this account. Please try again.");
+          handleRefreshCaptcha();
+          return;
+        }
       }
 
       setIsLoading(true);
