@@ -7,6 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "apk": "npm run build:apk",
     "build:apk": "vite build && npx cap sync android && cd android && gradlew.bat assembleDebug && cd .. && copy android\\app\\build\\outputs\\apk\\debug\\app-debug.apk hauloop-fmc650-diagnostics.apk"
   },
   "dependencies": {
