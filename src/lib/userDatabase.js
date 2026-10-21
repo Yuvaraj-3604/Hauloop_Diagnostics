@@ -10,24 +10,10 @@ export const STORAGE_KEYS = {
 // Global Cloud Sync Endpoint to bridge Web and APK registrations
 const CLOUD_SYNC_URL = "https://api.restful-api.dev/objects/ff808181a09d98f701a15d31bb43384b";
 
-// Built-in Seed Accounts (Preloaded for both Web and APK out-of-the-box)
+// Built-in Seed Accounts (Only official system admin and engineer)
 export const DEFAULT_SEED_USERS = [
   {
     id: "USR-SEED-001",
-    operatorId: "ADM-3604",
-    fullName: "Yuvaraj Perumal",
-    email: "yuvarajperumal364@gmail.com",
-    username: "yuvarajperumal364",
-    role: "Fleet Administrator",
-    password: "hauloop2026",
-    status: "Active",
-    securityClearance: "Level 3 (Root Telematics)",
-    terminalStation: "HAULOOP-TERM-04",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    lastLogin: new Date().toISOString()
-  },
-  {
-    id: "USR-SEED-002",
     operatorId: "ADM-1001",
     fullName: "System Administrator",
     email: "admin@hauloop.com",
@@ -41,7 +27,7 @@ export const DEFAULT_SEED_USERS = [
     lastLogin: new Date().toISOString()
   },
   {
-    id: "USR-SEED-003",
+    id: "USR-SEED-002",
     operatorId: "ENG-4825",
     fullName: "Diagnostic Field Engineer",
     email: "engineer@hauloop.com",
@@ -51,34 +37,6 @@ export const DEFAULT_SEED_USERS = [
     status: "Active",
     securityClearance: "Level 2 (Diagnostic Engineer)",
     terminalStation: "HAULOOP-TERM-02",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    lastLogin: new Date().toISOString()
-  },
-  {
-    id: "USR-SEED-004",
-    operatorId: "OP-6613",
-    fullName: "Yuvaraj",
-    email: "yuvarajpperumal364@gmail.com",
-    username: "yuvarajpperumal364",
-    role: "Fleet Administrator",
-    password: "hauloop2026",
-    status: "Active",
-    securityClearance: "Level 3 (Root Telematics)",
-    terminalStation: "HAULOOP-TERM-04",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    lastLogin: new Date().toISOString()
-  },
-  {
-    id: "USR-SEED-005",
-    operatorId: "OP-1901",
-    fullName: "Yuva",
-    email: "yuvarajperumalv@gmail.com",
-    username: "yuvarajperumalv",
-    role: "Fleet Administrator",
-    password: "hauloop2026",
-    status: "Active",
-    securityClearance: "Level 3 (Root Telematics)",
-    terminalStation: "HAULOOP-TERM-04",
     createdAt: "2026-01-01T00:00:00.000Z",
     lastLogin: new Date().toISOString()
   }
