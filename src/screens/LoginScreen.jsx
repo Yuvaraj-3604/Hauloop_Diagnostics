@@ -231,9 +231,10 @@ export default function LoginScreen({ onLoginSuccess }) {
 
       setIsLoading(true);
       setTimeout(() => {
+        const cleanEmail = emailOrUsername.trim();
         const newUser = {
-          username: emailOrUsername.trim().split("@")[0],
-          email: emailOrUsername.trim(),
+          username: cleanEmail.includes("@") ? cleanEmail.split("@")[0] : cleanEmail,
+          email: cleanEmail,
           fullName: fullName.trim(),
           role: role,
           password: password,
@@ -250,6 +251,7 @@ export default function LoginScreen({ onLoginSuccess }) {
           onLoginSuccess(
             {
               username: newUser.username,
+              email: newUser.email,
               fullName: newUser.fullName,
               role: newUser.role,
               operatorId: newUser.operatorId,
@@ -302,13 +304,16 @@ export default function LoginScreen({ onLoginSuccess }) {
         const userObj = matchedUser
           ? {
               username: matchedUser.username,
+              email: matchedUser.email,
               fullName: matchedUser.fullName,
               role: matchedUser.role,
               operatorId: matchedUser.operatorId,
               loginTime: new Date().toLocaleTimeString()
             }
           : {
-              username: cleanInput.includes("admin") ? "admin" : "engineer",
+              username: cleanInput.includes("@") ? cleanInput.split("@")[0] : (cleanInput.includes("admin") ? "admin" : "engineer"),
+              email: cleanInput.includes("@") ? emailOrUsername.trim() : (cleanInput.includes("admin") ? "admin@hauloop.com" : "engineer@hauloop.com"),
+              fullName: cleanInput.includes("@") ? cleanInput.split("@")[0] : (cleanInput.includes("admin") ? "Fleet Administrator" : "Diagnostic Engineer"),
               role: cleanInput.includes("admin") ? "Fleet Administrator" : "Diagnostic Engineer",
               operatorId: cleanInput.includes("admin") ? "ADM-1001" : "ENG-4825",
               loginTime: new Date().toLocaleTimeString()

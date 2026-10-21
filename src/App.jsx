@@ -38,7 +38,29 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const stored = localStorage.getItem("hauloop_auth");
-      return stored ? JSON.parse(stored).user : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const user = parsed.user;
+        // If email was not attached in previous session, look up registered account email
+        if (user && !user.email) {
+          try {
+            const registered = JSON.parse(localStorage.getItem("hauloop_registered_users") || "[]");
+            const match = registered.find(
+              (u) =>
+                (u.username && u.username.toLowerCase() === (user.username || "").toLowerCase()) ||
+                (u.fullName && u.fullName.toLowerCase() === (user.fullName || "").toLowerCase())
+            );
+            if (match && match.email) {
+              user.email = match.email;
+              localStorage.setItem("hauloop_auth", JSON.stringify({ ...parsed, user }));
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return user;
+      }
+      return null;
     } catch {
       return null;
     }

@@ -17,7 +17,34 @@ export default function ProfileDetailsModal({
   const fullName = currentUser?.fullName || currentUser?.username || "Yuvaraj Perumal";
   const role = currentUser?.role || "Fleet Administrator";
   const operatorId = currentUser?.operatorId || "ADM-3604";
-  const email = currentUser?.email || `${username}@hauloop.com`;
+
+  // Resolve exact account email ID used during registration (e.g., gmail.com, outlook.com)
+  // Never append or force @hauloop.com
+  const resolveEmail = () => {
+    if (currentUser?.email && currentUser.email.trim()) {
+      return currentUser.email.trim();
+    }
+    try {
+      const registered = JSON.parse(localStorage.getItem("hauloop_registered_users") || "[]");
+      const match = registered.find(
+        (u) =>
+          (u.username && u.username.toLowerCase() === (currentUser?.username || "").toLowerCase()) ||
+          (u.fullName && u.fullName.toLowerCase() === (currentUser?.fullName || "").toLowerCase()) ||
+          (u.email && u.email.toLowerCase().includes((currentUser?.username || "").toLowerCase()))
+      );
+      if (match && match.email) {
+        return match.email.trim();
+      }
+    } catch {
+      // ignore
+    }
+    if (username.includes("@")) {
+      return username;
+    }
+    return `${username}@gmail.com`;
+  };
+
+  const email = resolveEmail();
   const loginTime = currentUser?.loginTime || new Date().toLocaleTimeString();
 
   return (
