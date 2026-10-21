@@ -25,10 +25,10 @@ export default function ProfileDetailsModal({
 
   if (!isOpen) return null;
 
-  const username = currentUser?.username || "yuvarajperumal364";
-  const fullName = currentUser?.fullName || currentUser?.username || "Yuvaraj Perumal";
+  const username = currentUser?.username || "Operator";
+  const fullName = currentUser?.fullName || currentUser?.username || "Fleet Operator";
   const role = currentUser?.role || "Fleet Administrator";
-  const operatorId = currentUser?.operatorId || "ADM-3604";
+  const operatorId = currentUser?.operatorId || "ADM-1001";
 
   // Resolve exact account email ID used during registration (e.g., gmail.com, outlook.com)
   const resolveEmail = () => {
@@ -47,7 +47,7 @@ export default function ProfileDetailsModal({
     if (username.includes("@")) {
       return username;
     }
-    return `${username}@gmail.com`;
+    return currentUser?.email || "—";
   };
 
   const email = resolveEmail();

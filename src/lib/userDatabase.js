@@ -47,7 +47,7 @@ export function normalizeUser(raw) {
   const rawEmail = (raw.email || "").trim();
   const rawUser = (raw.username || "").trim();
   const derivedEmail =
-    rawEmail || (rawUser.includes("@") ? rawUser : (rawUser ? `${rawUser}@gmail.com` : ""));
+    rawEmail || (rawUser.includes("@") ? rawUser : "");
   const derivedUser = rawUser || (rawEmail.includes("@") ? rawEmail.split("@")[0] : rawEmail);
   const fullName = (raw.fullName || raw.name || derivedUser || "Fleet Operator").trim();
 

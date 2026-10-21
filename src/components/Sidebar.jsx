@@ -101,7 +101,7 @@ export default function Sidebar({ page, setPage, open, setOpen, snapshot, curren
             {(currentUser?.username || "FMC").slice(0, 3).toUpperCase()}
           </div>
           <div className="sidebar-footer-text">
-            <b>{currentUser?.username || "yuvarajperumal364"}</b>
+            <b>{currentUser?.username || "Operator"}</b>
             <small>{currentUser?.role || "Fleet Administrator"}</small>
           </div>
           <span className="sidebar-profile-badge" title="View Profile Details">

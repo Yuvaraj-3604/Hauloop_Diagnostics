@@ -155,20 +155,6 @@ export default function LoginScreen({ onLoginSuccess }) {
     setError(null);
   };
 
-  const handleQuickFill = (userType) => {
-    if (userType === "admin") {
-      setEmailOrUsername("admin@hauloop.com");
-      setPassword("hauloop2026");
-    } else {
-      setEmailOrUsername("engineer@hauloop.com");
-      setPassword("fmc650");
-    }
-    // Also auto-fill captcha for instant 1-click test login
-    if (captchaCode) {
-      setCaptchaInput(captchaCode);
-    }
-    setError(null);
-  };
 
   // Use centralized user_database storage
   const getRegisteredUsers = () => {
@@ -438,7 +424,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                   setEmailOrUsername(e.target.value);
                   if (error) setError(null);
                 }}
-                autoComplete="email"
+                autoComplete="off"
                 autoFocus={mode === "signin"}
               />
             </div>
@@ -480,7 +466,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                     setPassword(e.target.value);
                     if (error) setError(null);
                   }}
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  autoComplete="off"
                 />
                 <button
                   type="button"
@@ -634,24 +620,6 @@ export default function LoginScreen({ onLoginSuccess }) {
             )}
           </div>
 
-          {/* Discreet Quick Demo Credentials Fillers */}
-          <div className="hl-demo-pills">
-            <span className="hl-demo-label">Demo Quick Fill:</span>
-            <button
-              type="button"
-              className="hl-demo-pill"
-              onClick={() => handleQuickFill("admin")}
-            >
-              admin@hauloop.com
-            </button>
-            <button
-              type="button"
-              className="hl-demo-pill"
-              onClick={() => handleQuickFill("engineer")}
-            >
-              engineer@hauloop.com
-            </button>
-          </div>
 
           {/* Bottom Left Version Watermark */}
           <div className="hl-version-tag">v07/168/5</div>
